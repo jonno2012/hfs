@@ -32,6 +32,7 @@ class ConsumeArticles extends Command
     private ?AMQPStreamConnection $connection = null;
     private int $processedCount = 0;
     private int $maxMessages;
+    private bool $shouldStop = false;
 
     /**
      * Execute the console command.
@@ -63,21 +64,42 @@ class ConsumeArticles extends Command
                 $this->info("Maximum messages to process: {$this->maxMessages}");
             }
 
-            $callback = function (AMQPMessage $message) use ($channel, $queue) {
+            $this->shouldStop = false;
+            $callback = function (AMQPMessage $message) use ($channel, $queue, $processOnce) {
                 $this->processMessage($message, $channel, $queue);
+                
+                // Check if we should stop after processing this message
+                if ($processOnce && $this->processedCount > 0) {
+                    $this->shouldStop = true;
+                } elseif ($this->maxMessages > 0 && $this->processedCount >= $this->maxMessages) {
+                    $this->shouldStop = true;
+                }
             };
 
             $channel->basic_qos(null, 1, null); // Fair dispatch
             $channel->basic_consume($queue, '', false, false, false, false, $callback);
 
-            while ($channel->is_consuming()) {
-                if ($processOnce && $this->processedCount > 0) {
+            // For php-amqplib 2.x compatibility (no is_consuming() method)
+            // Use wait() with timeout in a loop and check shouldStop flag
+            while (!$this->shouldStop) {
+                try {
+                    // Wait for messages with a 1 second timeout
+                    // In version 2.x: wait($allowed_methods = null, $non_blocking = false, $timeout = 0)
+                    $channel->wait(null, false, 1);
+                } catch (\Exception $e) {
+                    // Check if it's a timeout exception (expected when no messages)
+                    $exceptionClass = get_class($e);
+                    if (str_contains($exceptionClass, 'Timeout') || 
+                        str_contains($e->getMessage(), 'timeout')) {
+                        // Timeout is expected, continue to check shouldStop flag
+                        continue;
+                    }
+                    // For other exceptions, rethrow if we're not stopping
+                    if (!$this->shouldStop) {
+                        throw $e;
+                    }
                     break;
                 }
-                if ($this->maxMessages > 0 && $this->processedCount >= $this->maxMessages) {
-                    break;
-                }
-                $channel->wait();
             }
 
             $channel->close();
