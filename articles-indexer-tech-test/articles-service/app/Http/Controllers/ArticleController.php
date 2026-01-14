@@ -7,11 +7,18 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreArticleRequest;
 use App\Http\Requests\UpdateArticleRequest;
 use App\Models\Article;
+use App\Services\ArticleEventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class ArticleController extends Controller
 {
+    public function __construct(
+        private readonly ArticleEventService $eventService,
+    ) {
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -35,7 +42,12 @@ class ArticleController extends Controller
      */
     public function store(StoreArticleRequest $request): JsonResponse
     {
-        $article = Article::create($request->validated());
+        $article = DB::transaction(function () use ($request) {
+            $article = Article::create($request->validated());
+            $this->eventService->publishCreated($article);
+
+            return $article;
+        });
 
         return response()->json([
             'data' => $article,
@@ -59,11 +71,16 @@ class ArticleController extends Controller
      */
     public function update(UpdateArticleRequest $request, string $id): JsonResponse
     {
-        $article = Article::findOrFail($id);
-        $article->update($request->validated());
+        $article = DB::transaction(function () use ($request, $id) {
+            $article = Article::findOrFail($id);
+            $article->update($request->validated());
+            $this->eventService->publishUpdated($article->fresh());
+
+            return $article->fresh();
+        });
 
         return response()->json([
-            'data' => $article->fresh(),
+            'data' => $article,
         ]);
     }
 
@@ -72,8 +89,12 @@ class ArticleController extends Controller
      */
     public function destroy(string $id): Response
     {
-        $article = Article::findOrFail($id);
-        $article->delete();
+        DB::transaction(function () use ($id) {
+            $article = Article::findOrFail($id);
+            $articleId = $article->id;
+            $article->delete();
+            $this->eventService->publishDeleted($articleId);
+        });
 
         return response()->noContent();
     }
