@@ -19,6 +19,68 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - articles-indexer-network
+
+  articles-service:
+    build:
+      context: ./articles-service
+      dockerfile: Dockerfile
+    container_name: articles-indexer-articles-service
+    ports:
+      - "8081:8000"
+    volumes:
+      - ./articles-service:/var/www/html
+      - articles_storage:/var/www/html/storage
+    environment:
+      APP_ENV: local
+      APP_DEBUG: true
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+      RABBITMQ_EXCHANGE: articles.events
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - articles-indexer-network
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+  indexer-service:
+    build:
+      context: ./indexer-service
+      dockerfile: Dockerfile
+    container_name: articles-indexer-indexer-service
+    volumes:
+      - ./indexer-service:/var/www/html
+      - indexer_storage:/var/www/html/storage
+    environment:
+      APP_ENV: local
+      APP_DEBUG: true
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+      RABBITMQ_QUEUE: indexer.articles
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - articles-indexer-network
+    command: php artisan rabbitmq:consume-articles
 
 volumes:
   rabbitmq_data:
+  articles_storage:
+  indexer_storage:
+
+networks:
+  articles-indexer-network:
+    driver: bridge
