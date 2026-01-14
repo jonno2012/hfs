@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Messaging\RabbitMqPublisher;
 use App\Models\Article;
+use App\Models\OutboxEvent;
 use Illuminate\Support\Str;
 
 class ArticleEventService
 {
     public function __construct(
-        private readonly RabbitMQEventPublisher $publisher,
+        private readonly RabbitMqPublisher $publisher,
     ) {
     }
 
@@ -93,16 +95,27 @@ class ArticleEventService
      */
     private function attemptPublish(string $eventId, string $eventName, string $routingKey, array $payload): void
     {
-        try {
-            $published = $this->publisher->publish($routingKey, $payload);
+        $result = $this->publisher->publish($routingKey, $payload);
 
-            if (! $published) {
-                $error = 'Failed to publish event to RabbitMQ';
-                $this->publisher->storeInOutbox($eventId, $eventName, $routingKey, $payload, $error);
-            }
-        } catch (\Exception $e) {
-            $error = 'Exception while publishing: ' . $e->getMessage();
-            $this->publisher->storeInOutbox($eventId, $eventName, $routingKey, $payload, $error);
+        if (! $result['success']) {
+            $this->storeInOutbox($eventId, $eventName, $routingKey, $payload, $result['error']);
         }
+    }
+
+    /**
+     * Store failed event in outbox.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function storeInOutbox(string $eventId, string $eventName, string $routingKey, array $payload, string $error): void
+    {
+        OutboxEvent::create([
+            'event_id' => $eventId,
+            'event_name' => $eventName,
+            'routing_key' => $routingKey,
+            'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
+            'attempts' => 1,
+            'last_error' => $error,
+        ]);
     }
 }

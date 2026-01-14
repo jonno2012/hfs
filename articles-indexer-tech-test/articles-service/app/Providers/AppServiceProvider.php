@@ -2,8 +2,7 @@
 
 namespace App\Providers;
 
-use App\Services\ArticleEventService;
-use App\Services\RabbitMQEventPublisher;
+use App\Messaging\RabbitMqPublisher;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -13,8 +12,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(RabbitMQEventPublisher::class, function ($app) {
-            return new RabbitMQEventPublisher(
+        $this->app->singleton(RabbitMqPublisher::class, function ($app) {
+            return new RabbitMqPublisher(
                 host: env('RABBITMQ_HOST', 'localhost'),
                 port: (int) env('RABBITMQ_PORT', 5672),
                 user: env('RABBITMQ_USER', 'guest'),
