@@ -15,7 +15,16 @@
   "policies": [],
   "queues": [
     {
-      "name": "articles.events",
+      "name": "indexer.articles",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "articles.events.dlx"
+      }
+    },
+    {
+      "name": "indexer.articles.dlq",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
@@ -24,9 +33,18 @@
   ],
   "exchanges": [
     {
-      "name": "articles",
+      "name": "articles.events",
       "vhost": "/",
       "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "articles.events.dlx",
+      "vhost": "/",
+      "type": "direct",
       "durable": true,
       "auto_delete": false,
       "internal": false,
@@ -35,10 +53,17 @@
   ],
   "bindings": [
     {
-      "source": "articles",
-      "destination": "articles.events",
+      "source": "articles.events",
+      "destination": "indexer.articles",
       "destination_type": "queue",
       "routing_key": "article.*",
+      "arguments": {}
+    },
+    {
+      "source": "articles.events.dlx",
+      "destination": "indexer.articles.dlq",
+      "destination_type": "queue",
+      "routing_key": "indexer.articles.dlq",
       "arguments": {}
     }
   ]
