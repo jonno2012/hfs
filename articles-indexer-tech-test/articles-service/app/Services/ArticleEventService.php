@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Messaging\RabbitMqPublisher;
+use App\Messaging\RabbitMqPublisherInterface;
 use App\Models\Article;
 use App\Models\OutboxEvent;
 use Illuminate\Support\Str;
@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class ArticleEventService
 {
     public function __construct(
-        private readonly RabbitMqPublisher $publisher,
+        private readonly RabbitMqPublisherInterface $publisher,
     ) {
     }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Messaging\RabbitMqPublisher;
+use App\Messaging\RabbitMqPublisherInterface;
 use App\Models\OutboxEvent;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -26,7 +26,7 @@ class OutboxReplayCommand extends Command
     protected $description = 'Replay unpublished events from the outbox';
 
     public function __construct(
-        private readonly RabbitMqPublisher $publisher,
+        private readonly RabbitMqPublisherInterface $publisher,
     ) {
         parent::__construct();
     }

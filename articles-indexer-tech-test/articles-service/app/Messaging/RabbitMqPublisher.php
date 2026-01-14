@@ -8,7 +8,7 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPExceptionInterface;
 use PhpAmqpLib\Message\AMQPMessage;
 
-class RabbitMqPublisher
+class RabbitMqPublisher implements RabbitMqPublisherInterface
 {
     private ?AMQPStreamConnection $connection = null;
 
