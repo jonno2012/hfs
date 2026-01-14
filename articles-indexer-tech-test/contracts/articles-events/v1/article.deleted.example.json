@@ -1,7 +1,7 @@
 {
-  "event": "article.deleted",
-  "timestamp": "2024-01-15T12:00:00Z",
-  "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000"
-  }
+  "version": "v1",
+  "event_id": "c0c0f3b2-7c3b-46c7-ae6e-3f1bdbf0b9a1",
+  "event_name": "article.deleted",
+  "occurred_at": "2026-01-14T11:10:00Z",
+  "article_id": "b6b2f1b1-9dc2-4c63-8e8f-1b4b3b3c2b1a"
 }

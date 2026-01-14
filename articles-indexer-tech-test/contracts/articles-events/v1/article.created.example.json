@@ -1,12 +1,13 @@
 {
-  "event": "article.created",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "title": "Example Article Title",
-    "body": "This is the article body content.",
-    "status": "published",
-    "created_at": "2024-01-15T10:30:00Z",
-    "updated_at": "2024-01-15T10:30:00Z"
+  "version": "v1",
+  "event_id": "2f3d7d5c-4d8d-4b57-a142-8a0c64bfe0c1",
+  "event_name": "article.created",
+  "occurred_at": "2026-01-14T11:00:00Z",
+  "article_id": "b6b2f1b1-9dc2-4c63-8e8f-1b4b3b3c2b1a",
+  "article": {
+    "id": "b6b2f1b1-9dc2-4c63-8e8f-1b4b3b3c2b1a",
+    "title": "Hello",
+    "body": "World",
+    "status": "draft"
   }
 }
