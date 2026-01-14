@@ -71,6 +71,7 @@ services:
       RABBITMQ_PASSWORD: guest
       RABBITMQ_VHOST: /
       RABBITMQ_QUEUE: indexer.articles
+      RABBITMQ_EXCHANGE: articles.events
     depends_on:
       rabbitmq:
         condition: service_healthy

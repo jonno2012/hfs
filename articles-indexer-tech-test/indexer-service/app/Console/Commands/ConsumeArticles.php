@@ -48,15 +48,22 @@ class ConsumeArticles extends Command
         $password = env('RABBITMQ_PASSWORD', 'guest');
         $vhost = env('RABBITMQ_VHOST', '/');
         $queue = env('RABBITMQ_QUEUE', 'indexer.articles');
+        $exchange = env('RABBITMQ_EXCHANGE', 'articles.events');
 
         try {
             $this->connection = new AMQPStreamConnection($host, $port, $user, $password, $vhost);
             $channel = $this->connection->channel();
 
+            // Declare exchange (durable, topic type)
+            $channel->exchange_declare($exchange, 'topic', false, true, false);
+
             // Declare queue (durable)
             $channel->queue_declare($queue, false, true, false, false);
 
-            $this->info("Consuming messages from queue: {$queue}");
+            // Bind queue to exchange with routing key pattern
+            $channel->queue_bind($queue, $exchange, 'article.*');
+
+            $this->info("Consuming messages from queue: {$queue} (bound to exchange: {$exchange})");
             if ($processOnce) {
                 $this->info('Processing one message only');
             }
@@ -122,7 +129,8 @@ class ConsumeArticles extends Command
      */
     private function processMessage(AMQPMessage $message, $channel, string $queue): void
     {
-        $deliveryTag = $message->getDeliveryTag();
+        // php-amqplib 2.x API: delivery tag is in delivery_info array
+        $deliveryTag = $message->delivery_info['delivery_tag'];
         $body = $message->getBody();
 
         try {
