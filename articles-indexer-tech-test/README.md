@@ -30,6 +30,11 @@ This will start:
 - RabbitMQ (ports 5672, 15672)
 - Articles Service (port 8081)
 - Indexer Service (CLI, no HTTP port)
+- RabbitMQ Management UI Monitoring 15672
+
+RabbitMQ credentials:
+Username: guest
+Password: guest
 
 ## Migrations
 
@@ -124,6 +129,14 @@ From the UI you can:
 - Monitor message flow
 - Inspect messages in queues
 
+## Linting & Static Analysis
+# Run Pint
+- docker compose exec articles-service composer lint
+- docker compose exec indexer-service composer lint
+
+# Run PHPStan (Static Analysis)
+- docker compose exec articles-service composer stan
+- docker compose exec indexer-service composer stan
 ## Trade-offs & Assumptions
 
 ### Database Choice

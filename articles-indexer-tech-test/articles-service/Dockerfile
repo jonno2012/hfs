@@ -1,23 +1,36 @@
 FROM php:8.3-cli-alpine
 
-# Install required system dependencies
-RUN apk add --no-cache sqlite
+ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo pdo_sqlite
+# System deps + build deps (safe on Alpine), then PHP extensions
+RUN apk add --no-cache \
+        sqlite sqlite-dev \
+        linux-headers \
+        $PHPIZE_DEPS \
+    && docker-php-ext-install -j"$(nproc)" \
+        pdo pdo_sqlite bcmath sockets \
+    && apk del $PHPIZE_DEPS linux-headers
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Composer (pin major version)
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files and install dependencies
+# Install PHP dependencies first for better layer caching
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer install --no-interaction --optimize-autoloader --no-scripts
 
 # Copy application code
 COPY . .
 
-# Default command
+# Copy and set up entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Ensure sqlite file exists (harmless if it already does)
+RUN mkdir -p database && touch database/database.sqlite
+
+# Run the API
+EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]

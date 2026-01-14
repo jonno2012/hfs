@@ -31,6 +31,7 @@ services:
       - "8081:8000"
     volumes:
       - ./articles-service:/var/www/html
+      - articles_vendor:/var/www/html/vendor
       - articles_storage:/var/www/html/storage
     environment:
       APP_ENV: local
@@ -57,6 +58,7 @@ services:
     container_name: articles-indexer-indexer-service
     volumes:
       - ./indexer-service:/var/www/html
+      - indexer_vendor:/var/www/html/vendor
       - indexer_storage:/var/www/html/storage
     environment:
       APP_ENV: local
@@ -79,7 +81,9 @@ services:
 volumes:
   rabbitmq_data:
   articles_storage:
+  articles_vendor:
   indexer_storage:
+  indexer_vendor:
 
 networks:
   articles-indexer-network:
