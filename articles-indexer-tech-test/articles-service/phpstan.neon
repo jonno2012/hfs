@@ -1,0 +1,12 @@
+parameters:
+  level: 8
+  paths:
+    - app
+    - routes
+  tmpDir: storage/phpstan
+  checkMissingIterableValueType: false
+  checkGenericClassInNonGenericObjectType: false
+
+includes:
+  - vendor/phpstan/phpstan-strict-rules/rules.neon
+  - vendor/phpstan/phpstan-deprecation-rules/rules.neon
