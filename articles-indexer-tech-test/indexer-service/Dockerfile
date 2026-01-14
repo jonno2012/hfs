@@ -31,7 +31,5 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Ensure sqlite file exists
 RUN mkdir -p database && touch database/database.sqlite
 
-# Keep container running; run consumer via:
-# docker compose exec indexer-service php artisan rabbitmq:consume-articles
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["sleep", "infinity"]
