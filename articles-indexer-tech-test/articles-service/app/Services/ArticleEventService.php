@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Messaging\RabbitMqPublisherInterface;
 use App\Models\Article;
 use App\Models\OutboxEvent;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ArticleEventService
@@ -98,6 +99,12 @@ class ArticleEventService
         $result = $this->publisher->publish($routingKey, $payload);
 
         if (! $result['success']) {
+            Log::warning('Failed to publish event to RabbitMQ', [
+                'event_id' => $eventId,
+                'event_name' => $eventName,
+                'routing_key' => $routingKey,
+                'error' => $result['error'],
+            ]);
             $this->storeInOutbox($eventId, $eventName, $routingKey, $payload, $result['error']);
         }
     }
