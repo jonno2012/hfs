@@ -20,7 +20,7 @@ return new class extends Migration
             $table->dateTime('published_at')->nullable();
             $table->integer('attempts')->default(0);
             $table->text('last_error')->nullable();
-            $table->timestamp('created_at')->useCurrent();
+            $table->timestamps();
         });
     }
 

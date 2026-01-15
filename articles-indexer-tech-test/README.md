@@ -71,6 +71,151 @@ docker compose exec articles-service php artisan outbox:replay
 Options:
 - `--limit=N`: Process up to N events (default: 100)
 
+### Manual Testing: Outbox Pattern
+
+Test the outbox pattern by simulating a RabbitMQ failure and verifying that events are stored and can be replayed.
+
+#### Step 1: Stop RabbitMQ
+
+Stop RabbitMQ to simulate a connection failure:
+
+```bash
+docker compose stop rabbitmq
+```
+
+#### Step 2: Trigger Events (These Will Fail to Publish)
+
+With RabbitMQ stopped, create, update, or delete articles. The events will fail to publish and be stored in the `outbox_events` table:
+
+**Create an article:**
+```bash
+# PowerShell
+Invoke-RestMethod -Uri http://localhost:8081/api/articles -Method POST -ContentType "application/json" -Body '{"title": "Test Article", "body": "Test body", "status": "draft"}'
+
+# Bash
+curl -X POST http://localhost:8081/api/articles \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Test Article", "body": "Test body", "status": "draft"}'
+```
+
+**Update an article:**
+```bash
+# PowerShell
+Invoke-RestMethod -Uri http://localhost:8081/api/articles/{article-id} -Method PUT -ContentType "application/json" -Body '{"title": "Updated Title", "body": "Updated body", "status": "published"}'
+
+# Bash
+curl -X PUT http://localhost:8081/api/articles/{article-id} \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Updated Title", "body": "Updated body", "status": "published"}'
+```
+
+**Delete an article:**
+```bash
+curl -X DELETE http://localhost:8081/api/articles/{article-id}
+```
+
+#### Step 3: Verify Events Are Stored in Outbox
+
+Check that events were stored in the `outbox_events` table:
+
+```bash
+docker compose exec articles-service php artisan tinker
+```
+
+Then in tinker:
+
+```php
+// Check for unpublished events
+\App\Models\OutboxEvent::whereNull('published_at')->count();
+
+// View unpublished events
+\App\Models\OutboxEvent::whereNull('published_at')->get(['event_name', 'routing_key', 'attempts', 'last_error']);
+
+// Or check directly in SQLite
+// docker compose exec articles-service sqlite3 database/database.sqlite "SELECT id, event_name, routing_key, published_at, attempts, last_error FROM outbox_events WHERE published_at IS NULL;"
+```
+
+**Expected result:** You should see events with `published_at = NULL`, `attempts = 1`, and `last_error` containing a RabbitMQ connection error.
+
+#### Step 4: Restart RabbitMQ
+
+Restart RabbitMQ so events can be published:
+
+```bash
+docker compose start rabbitmq
+```
+
+Wait a few seconds for RabbitMQ to be ready (check http://localhost:15672).
+
+#### Step 5: Replay Outbox Events
+
+Replay the stored events:
+
+```bash
+docker compose exec articles-service php artisan outbox:replay
+```
+
+Or replay with a limit:
+
+```bash
+docker compose exec articles-service php artisan outbox:replay --limit=10
+```
+
+**Expected output:**
+```
+Starting outbox replay (limit: 100)...
+Found 3 unpublished event(s).
+✓ Published event {id} (article.created)
+✓ Published event {id} (article.updated)
+✓ Published event {id} (article.deleted)
+
+Summary:
+  Total processed: 3
+  Successful: 3
+  Failed: 0
+```
+
+#### Step 6: Verify Events Were Published
+
+**Check the outbox_events table:**
+
+```bash
+docker compose exec articles-service php artisan tinker
+```
+
+```php
+// Check that published_at is now set
+\App\Models\OutboxEvent::whereNotNull('published_at')->count();
+
+// View all events
+\App\Models\OutboxEvent::all(['id', 'event_name', 'published_at', 'attempts']);
+```
+
+**Check RabbitMQ Management Console:**
+
+1. Open http://localhost:15672 (guest/guest)
+2. Go to **Exchanges** → `articles.events`
+3. Check "Message stats" → "Published" count (should increase)
+4. Go to **Queues** → `indexer.articles`
+5. Check "Ready" count (messages should be in the queue if consumer is not running)
+
+**Expected result:** 
+- ✅ `published_at` is populated for all replayed events
+- ✅ `last_error` is cleared (set to NULL)
+- ✅ Events appear in RabbitMQ (check exchange publish count or queue)
+
+#### Troubleshooting
+
+**Events not appearing in RabbitMQ:**
+- Verify RabbitMQ is running: `docker compose ps rabbitmq`
+- Check RabbitMQ logs: `docker compose logs rabbitmq`
+- Verify connection in Management UI: http://localhost:15672
+
+**Events still show as unpublished after replay:**
+- Check replay command output for errors
+- Verify RabbitMQ connection settings in `.env`
+- Check `last_error` field for specific error messages
+
 ## API Examples
 
 The Articles Service API is available at `http://localhost:8081/api/articles`.

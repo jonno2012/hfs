@@ -44,6 +44,7 @@ class OutboxEvent extends Model
             'published_at' => 'datetime',
             'attempts' => 'integer',
             'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
     }
 }
