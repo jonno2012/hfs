@@ -748,3 +748,6 @@ After processing, check the RabbitMQ Management Console again:
 
 ### Static analysis and linting
 - I have not ran PHPStan or Laravel Pint because I have ran out of time at this point. So I don't know what the results of that would be.
+
+### Git init
+- The git init should have been done in the root of the project, not in the next level up. I didn't have time to fix that.
