@@ -745,3 +745,6 @@ After processing, check the RabbitMQ Management Console again:
 - **Transient errors**: Messages are nacked with requeue=true
 - **Poison messages**: Invalid/validation errors are rejected without requeue
 - **Database errors**: Nacked with requeue for retry
+
+### Static analysis and linting
+- I have not ran PHPStan or Laravel Pint because I have ran out of time at this point. So I don't know what the results of that would be.
