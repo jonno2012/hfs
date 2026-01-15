@@ -50,6 +50,16 @@ docker compose exec articles-service cp .env.example .env
 docker compose exec indexer-service cp .env.example .env
 ```
 
+**Why `.env` files aren't created automatically:**
+
+Laravel includes a Composer script (`post-root-package-install`) that automatically copies `.env.example` to `.env` when you create a new Laravel project using `composer create-project`. However, this script only runs during the initial project creation, not when:
+
+- Cloning an existing repository from version control
+- Installing dependencies in an existing project (`composer install`)
+- Running the application in Docker containers
+
+Since this is an existing project that's been cloned from a repository, the `.env` files need to be created manually (or automatically by the Docker entrypoint scripts). The Docker entrypoint scripts in this project will automatically create `.env` files from `.env.example` if they don't exist, so you may not need to create them manually if you're using Docker.
+
 **Note:** The `.env.example` files contain all necessary environment variables with default values. The Docker Compose configuration will override these values when running in containers, but having `.env` files prevents Laravel from showing warnings during bootstrap.
 
 ### Step 2: Start Services
