@@ -179,6 +179,8 @@ Then in tinker:
 // docker compose exec articles-service sqlite3 database/database.sqlite "SELECT id, event_name, routing_key, published_at, attempts, last_error FROM outbox_events WHERE published_at IS NULL;"
 ```
 
+** If you want to view the replayed events in the RabbitMQ management console, make sure the consumer is turned off otherwise they will be processed immediately and you won't be able to view them in the Ready queue. **
+
 **Expected result:** You should see events with `published_at = NULL`, `attempts = 1`, and `last_error` containing a RabbitMQ connection error.
 
 #### Step 4: Restart RabbitMQ
@@ -722,6 +724,7 @@ After processing, check the RabbitMQ Management Console again:
 # Run PHPStan (Static Analysis)
 - docker compose exec articles-service composer stan
 - docker compose exec indexer-service composer stan
+
 ## Trade-offs & Assumptions
 
 ### Database Choice
@@ -756,8 +759,11 @@ After processing, check the RabbitMQ Management Console again:
 - **Poison messages**: Invalid/validation errors are rejected without requeue
 - **Database errors**: Nacked with requeue for retry
 
-### Static analysis and linting
-- I have not ran PHPStan or Laravel Pint because I have ran out of time at this point. So I don't know what the results of that would be.
+### Static analysis
+- There are errors when running PHPStan relating to an invalid configuration. I have not fixed this as I have ran out of time.
 
 ### Git init
 - The git init should have been done in the root of the project, not in the next level up. I didn't have time to fix that.
+
+### Manual Testing
+- All of the manual testing outlined in this guide (idempotency handling, outbox handling etc) could have been done maybe with sh scripts or something similar. Due to time constraints I've left it to manual testing.
