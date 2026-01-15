@@ -20,6 +20,40 @@ articles-indexer-tech-test/
 
 ## Setup
 
+### Step 1: Configure Environment Variables
+
+Laravel applications require a `.env` file for configuration. While Docker Compose sets environment variables, Laravel's bootstrap process still expects a `.env` file to exist (even if empty) to prevent warnings.
+
+**Why `.env` files are needed:**
+- Laravel's bootstrap process attempts to read `.env` files during application startup
+- Even though Docker Compose provides environment variables, Laravel will show warnings if `.env` files are missing
+- The `.env` files are gitignored (as they should be) and won't be committed to version control
+- Tests use `phpunit.xml` for configuration, but the application still expects `.env` files to exist
+
+**Create `.env` files from `.env.example`:**
+
+```bash
+# Articles Service
+cp articles-service/.env.example articles-service/.env
+
+# Indexer Service
+cp indexer-service/.env.example indexer-service/.env
+```
+
+**Or create them inside Docker containers:**
+
+```bash
+# Articles Service
+docker compose exec articles-service cp .env.example .env
+
+# Indexer Service
+docker compose exec indexer-service cp .env.example .env
+```
+
+**Note:** The `.env.example` files contain all necessary environment variables with default values. The Docker Compose configuration will override these values when running in containers, but having `.env` files prevents Laravel from showing warnings during bootstrap.
+
+### Step 2: Start Services
+
 Start all services:
 
 ```bash

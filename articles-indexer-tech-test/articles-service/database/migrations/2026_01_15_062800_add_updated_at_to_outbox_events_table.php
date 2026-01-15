@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('outbox_events', function (Blueprint $table) {
-            $table->timestamp('updated_at')->nullable()->after('created_at');
+            if (!Schema::hasColumn('outbox_events', 'updated_at')) {
+                $table->timestamp('updated_at')->nullable()->after('created_at');
+            }
         });
     }
 
