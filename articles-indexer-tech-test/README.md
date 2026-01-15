@@ -759,8 +759,9 @@ After processing, check the RabbitMQ Management Console again:
 - **Poison messages**: Invalid/validation errors are rejected without requeue
 - **Database errors**: Nacked with requeue for retry
 
-### Static analysis
+### Static analysis and Lint
 - There are errors when running PHPStan relating to an invalid configuration. I have not fixed this as I have ran out of time.
+- I forgot to run Laravel Pint before I tested everything. Therefore I haven't committed the linting changes because I have ran out of time and I do not want to another round of testing after having ran the linting.
 
 ### Git init
 - The git init should have been done in the root of the project, not in the next level up. I didn't have time to fix that.
