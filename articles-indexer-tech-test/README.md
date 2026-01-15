@@ -486,6 +486,190 @@ The consumer should NOT be running automatically - messages need to stay in the 
 - They're due to PHP 8.3 compatibility issues in the library
 - You can ignore them - messages will still be published successfully
 
+## Testing Stale Event Protection
+
+Test that the consumer correctly prevents older events from overwriting newer data when messages arrive out of order. This feature compares `occurred_at` timestamps to ensure events are processed chronologically.
+
+### Prerequisites
+
+Before running the test, ensure:
+1. Docker containers are running: `docker compose up -d`
+2. Migrations have been run for the indexer service:
+   ```bash
+   docker compose exec indexer-service php artisan migrate
+   ```
+3. RabbitMQ is accessible (check http://localhost:15672)
+
+### Step-by-Step Test Process
+
+**IMPORTANT:** The consumer must NOT be running before you publish test messages. The consumer will automatically consume messages as they arrive, so you need to manually start it only after publishing.
+
+#### Step 1: Ensure Consumer is NOT Running
+
+Before publishing test messages, verify the consumer is not running:
+
+```bash
+# Check if a consumer process is running
+docker compose exec indexer-service ps aux | grep consume
+```
+
+If you see a consumer process, stop and restart the container to ensure it's stopped:
+
+```bash
+docker compose stop indexer-service
+docker compose up -d indexer-service
+```
+
+The `indexer-service` container is configured to run `sleep infinity` by default, so the consumer will NOT start automatically. This allows messages to accumulate in the queue for testing.
+
+#### Step 2: Publish Events Out of Order Using test-stale-protection.php
+
+Use the `test-stale-protection.php` script to publish two events for the same `article_id` with different `occurred_at` timestamps. The script publishes the newer event first, simulating out-of-order delivery:
+
+```bash
+# Copy script to container
+docker compose cp test-stale-protection.php indexer-service:/tmp/test-stale-protection.php
+
+# Run it
+docker compose exec indexer-service php /tmp/test-stale-protection.php
+
+# Clean up
+docker compose exec indexer-service rm /tmp/test-stale-protection.php
+```
+
+The script will:
+- Publish **2 events** for the same `article_id`:
+  - **Older event**: `occurred_at = 2024-01-15 10:00:00`, title = "Older Title"
+  - **Newer event**: `occurred_at = 2024-01-15 10:01:00`, title = "Newer Title"
+- Publish the **newer event first** (simulating out-of-order delivery)
+- Display the `article_id` and both `event_id`s for reference
+- Show the final queue count
+
+**Expected output:**
+```
+=== Publishing Events ===
+Article ID: test-article-stale-1234567890
+Event 1 (OLDER): occurred_at = 2024-01-15T10:00:00+00:00, title = 'Older Title'
+Event 2 (NEWER): occurred_at = 2024-01-15T10:01:00+00:00, title = 'Newer Title'
+
+Publishing NEWER event first...
+✓ Published newer event (event_id: event-newer-...)
+Publishing OLDER event second...
+✓ Published older event (event_id: event-older-...)
+
+Queue 'indexer.articles' now has 2 message(s)
+
+=== Test Setup Complete ===
+Article ID: test-article-stale-1234567890
+Older Event ID: event-older-...
+Newer Event ID: event-newer-...
+
+Next: Process messages with consumer and verify stale event is skipped.
+```
+
+**Note:** Save the `article_id` and `event_id`s from the output - you'll need them for verification.
+
+#### Step 3: Process Messages with Consumer
+
+Now start the consumer to process both messages:
+
+```bash
+docker compose exec indexer-service php artisan rabbitmq:consume-articles --max=2
+```
+
+**What to watch for in the output:**
+- First message (newer event): Should show "Processed successfully (event: article.updated, article_id: ...)"
+- Second message (older event): Should show "Stale event ignored (event_id: ..., article_id: ...)" - this confirms stale protection!
+
+**Expected output:**
+```
+Message 1: Processed successfully (event: article.updated, article_id: test-article-stale-...)
+Message 2: Stale event ignored (event_id: event-older-..., article_id: test-article-stale-...)
+Processed 2 message(s)
+```
+
+The consumer will process both messages and then exit (due to `--max=2`).
+
+#### Step 4: Verify Stale Event Protection in Database
+
+After the consumer completes, verify that:
+1. The newer event was applied (article has "Newer Title")
+2. The older event was skipped (stale protection worked)
+3. Both events were recorded in `processed_events` (idempotency)
+
+**Using Laravel Tinker:**
+
+```bash
+docker compose exec indexer-service php artisan tinker
+```
+
+Then in tinker (replace `test-article-stale-...` with the actual `article_id` from Step 2):
+
+```php
+// Find the article
+$articleId = 'test-article-stale-...'; // Use the article_id from script output
+$article = \App\Models\IndexedArticle::where('article_id', $articleId)->first();
+
+// Check the final state - should reflect the NEWER event
+$article->title;        // Should be "Newer Title" (NOT "Older Title")
+$article->body;         // Should be "This is the newer event"
+$article->status;       // Should be "published"
+$article->last_event;   // Should be "article.updated"
+$article->last_event_at; // Should be "2024-01-15 10:01:00" (newer timestamp)
+
+// Check processed events - BOTH should be recorded
+\App\Models\ProcessedEvent::where('event_id', 'like', 'event-%')
+    ->orderBy('processed_at')
+    ->get(['event_id', 'event_name', 'processed_at']);
+// Should show both events were recorded, even though one was stale
+```
+
+**Using SQLite directly:**
+
+```bash
+# Check the indexed article (replace article_id)
+docker compose exec indexer-service sqlite3 database/database.sqlite "SELECT article_id, title, status, last_event, last_event_at FROM indexed_articles WHERE article_id LIKE 'test-article-stale-%';"
+
+# Check processed events
+docker compose exec indexer-service sqlite3 database/database.sqlite "SELECT event_id, event_name, processed_at FROM processed_events WHERE event_id LIKE 'event-%' ORDER BY processed_at;"
+```
+
+**Test PASSES if:**
+- ✅ Article title is "Newer Title" (not "Older Title")
+- ✅ Article `last_event_at` is `2024-01-15 10:01:00` (newer timestamp)
+- ✅ Consumer log shows "Stale event ignored" for the older event
+- ✅ Both events appear in `processed_events` table (both were recorded as processed)
+
+**What this proves:**
+- The time-based comparison (`occurred_at` vs `last_event_at`) successfully prevents stale events from overwriting newer data
+- The consumer correctly handles out-of-order message delivery
+- Older events are skipped but still recorded as processed (for idempotency)
+- The final state reflects the most recent event, not the first one processed
+
+#### Step 5: Verify Queue is Empty
+
+After processing, check the RabbitMQ Management Console again:
+
+1. Go to **Queues** > `indexer.articles`
+2. **Ready** should be 0 (all messages processed)
+3. **Total** shows how many messages were processed (should be 2)
+
+### Troubleshooting
+
+**Issue: Both events are processed (no stale detection)**
+- Verify the `occurred_at` timestamps are different (check the script output)
+- Check that the newer event was processed first (look at consumer logs)
+- Ensure the article exists before the older event arrives (check `indexed_articles` table)
+
+**Issue: Article shows "Older Title" instead of "Newer Title"**
+- Verify the events were published in the correct order (newer first)
+- Check that the consumer processed messages in the order they were published
+- Verify `last_event_at` timestamp matches the newer event's `occurred_at`
+
+**Issue: No messages appear in RabbitMQ Management UI**
+- Check if a consumer is running: `docker compose exec indexer-service ps aux | grep consume`
+- If consumer is running, stop and restart the container: `docker compose stop indexer-service && docker compose up -d indexer-service`
+
 ## Linting & Static Analysis
 # Run Pint
 - docker compose exec articles-service composer lint
